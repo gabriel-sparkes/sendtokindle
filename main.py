@@ -26,8 +26,6 @@ with open("users.dat", "rb") as f:
     except:
         users = {}
 
-print(users)
-
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 KINDLE_EMAIL = os.getenv("KINDLE_EMAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
