@@ -7,7 +7,7 @@ import smtplib
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler
-from telegram.ext.filters import TEXT, ATTACHMENT
+from telegram.ext.filters import TEXT, Document
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -37,7 +37,7 @@ def is_valid_email(text: str):
     else:
         return False
     
-def send_mail(send_from: str, send_to: str, text:str, subject: str, file: str):
+def send_mail(send_from: str, send_to: str, text:str, subject: str, file: str, file_name: str):
     s = smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ssl.create_default_context())
 
     message = MIMEMultipart()
@@ -49,7 +49,7 @@ def send_mail(send_from: str, send_to: str, text:str, subject: str, file: str):
 
     with open(file, "rb") as f:
         part = MIMEApplication(f.read(), Name=f.name)
-    part['Content-Disposition'] = f'attachment; filename="{f.name}"'
+    part['Content-Disposition'] = f'attachment; filename="{file_name}"'
     message.attach(part)
 
     with s:
@@ -59,11 +59,11 @@ def send_mail(send_from: str, send_to: str, text:str, subject: str, file: str):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users[update.effective_user.id] = {}
-    await update.message.reply_text(f"Hello {update.effective_user.first_name}!\nI can help you send your documents to your kindle!\nSend /setup for a tutorial on how to enable this bot to send it files and to set your kindle's email\nNB: I will forward any file you send me, but sending PDF and EPUB files only is <b>strongly recommended</b>", parse_mode="HTML")
+    await update.message.reply_text(f"Hello {update.effective_user.first_name}!\nI can help you send your documents to your kindle!\nSend /setup for a tutorial on how to enable this bot to send it files and to set your kindle's email\nNB: I will forward any document you send me, but sending PDF and EPUB files only is <b>strongly recommended</b>. Additionally, you'll have to navigate to your <a href=\"https://amazon.com/myk\">Manage Your Content and Devices page</a> to delete documents you've sent to your kindle", parse_mode="HTML")
 
 async def setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users[update.effective_user.id]["setting"] = True
-    await update.message.reply_text(f"<b><i>Setup</i></b>\nGo to your <a href=\"https://amazon.com/my\">Manage Your Content and Devices page</a>, then navigate to <b>Preferences</b> and click <b>Personal Document Settings</b>. Make a note of your kindle's email address, which you may also modify.\nIn the <b>Approved Personal Document E-mail List</b> section, add {KINDLE_EMAIL}\nNow just send me your kindle email and we're done! 😉\nIf you want me to <b>forget</b> your email address, send /forget at any time", parse_mode="HTML")
+    await update.message.reply_text(f"<b><i>Setup</i></b>\nGo to your <a href=\"https://amazon.com/myk\">Manage Your Content and Devices page</a>, then navigate to <b>Preferences</b> and click <b>Personal Document Settings</b>. Make a note of your kindle's email address, which you may also modify.\nIn the <b>Approved Personal Document E-mail List</b> section, add {KINDLE_EMAIL}\nNow just send me your kindle email and we're done! 😉\nIf you want me to <b>forget</b> your email address, send /forget at any time", parse_mode="HTML")
 
 async def set_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users[update.effective_user.id]["setting"] = True
@@ -94,17 +94,18 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await update.message.reply_text("Please enter a valid kindle email address (must end in '@kindle.com'!)")
 
-async def attachment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not "email" in users[update.effective_user.id]:
         await update.message.reply_text("Email is not set!")
     else:
         await update.message.reply_text("Working on it...")
         try:
             to = users[update.effective_user.id]["email"]
-            file_id = update.message.effective_attachment.file_id
+            file_id = update.message.document.file_id
             file = await context.bot.get_file(file_id)
+            file_name = update.message.document.file_name
             path = await file.download_to_drive()
-            send_mail(KINDLE_EMAIL, to, "Here's your file! :)", "Your file", path)
+            send_mail(KINDLE_EMAIL, to, "Here's your file! :)", "Your file, sent via @sendtokindle_robot on telegram", path, file_name)
             os.remove(path)
             await update.message.reply_text("Your file has been sent successfully!")
         except Exception as e:
@@ -124,7 +125,7 @@ app.add_handler(CommandHandler("set", set_email))
 app.add_handler(CommandHandler("cancel", cancel))
 app.add_handler(CommandHandler("forget", forget))
 app.add_handler(MessageHandler(TEXT, message))
-app.add_handler(MessageHandler(ATTACHMENT, attachment))
+app.add_handler(MessageHandler(Document.ALL, document))
 a.register(exit_handler)
 
 app.run_polling()
