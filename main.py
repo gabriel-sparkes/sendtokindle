@@ -8,8 +8,8 @@ import smtplib
 import threading
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler
 from telegram.ext.filters import TEXT, Document
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -46,6 +46,9 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 KINDLE_EMAIL = os.getenv("KINDLE_EMAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 SUPPORTED_FILETYPES = ["application/pdf", "application/epub+zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword", "application/rtf", "text/html", "text/plain", "application/zip", "image/jpeg", "image/gif", "image/bmp", "image/png"]
+CALLBACK_SUPPORTED = "supported_filetypes"
+CALLBACK_BACK = "back"
+KOFI_URL = "https://ko-fi.com/gabrielsparkes"
 
 def first_of_month():
     print("Started checking date")
@@ -87,7 +90,9 @@ def send_mail(send_from: str, send_to: str, text: str, subject: str, file: str, 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users[update.effective_user.id] = {}
-    await update.message.reply_text(f"Hello {update.effective_user.first_name}!\nI can help you send your documents to your kindle!\nSend /setup for a tutorial on how to enable this bot to send it files and to set your kindle's email\nNB: I will forward any document you send me, but sending PDF and EPUB files only is <b>strongly recommended</b>. Please note that support for MOBI files will be discontinued soon.\nAdditionally, you'll have to navigate to your <a href=\"https://amazon.com/myk\">Manage Your Content and Devices page</a> to delete documents you've sent to your kindle", parse_mode="HTML")
+    buttons = [[InlineKeyboardButton("View supported filetypes", callback_data=CALLBACK_SUPPORTED)], [InlineKeyboardButton("Support me", KOFI_URL)]]
+    keyboard = InlineKeyboardMarkup(buttons)
+    await update.message.reply_text(f"Hello {update.effective_user.first_name}!\nI can help you send documents to your kindle!\nSend /setup for a tutorial on how to enable this bot to send files to your kindle email", parse_mode="HTML", reply_markup=keyboard)
 
 async def setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users[update.effective_user.id]["setting"] = True
@@ -165,6 +170,17 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await update.message.reply_text("Please enter a valid kindle email address (must end in '@kindle.com'!)")
 
+async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = update.callback_query.data
+    if data == CALLBACK_SUPPORTED:
+        buttons = [[InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_BACK)]]
+        keyboard = InlineKeyboardMarkup(buttons)
+        await update.callback_query.message.edit_text("The following filetypes are currently supported: EPUB (.epub), Adobe PDF (.pdf), Microsoft Word (.doc, .docx), Rich Text Format (.rtf), HTML (.htm, .html), text documents (.txt), compressed documents (.zip), JPEG images (.jpg), GIF (.gif), Bitmap (.bmp), PNG (.png).\n<b>If you send a file with a filetype other than the ones listed, I won't be able to forward it</b>", parse_mode="HTML", reply_markup=keyboard)
+    elif data == CALLBACK_BACK:
+        buttons = [[InlineKeyboardButton("View supported filetypes", callback_data=CALLBACK_SUPPORTED)], [InlineKeyboardButton("Support me", KOFI_URL)]]
+        keyboard = InlineKeyboardMarkup(buttons)
+        await update.callback_query.message.edit_text(f"Hello {update.effective_user.first_name}!\nI can help you send your documents to your kindle!\nSend /setup for a tutorial on how to enable this bot to send it files and to set your kindle's email", reply_markup=keyboard)
+
 def exit_handler():
     with open("users.dat", "wb") as f:
         p.dump(users, f)
@@ -182,6 +198,7 @@ app.add_handler(CommandHandler("forget", forget))
 app.add_handler(CommandHandler("stats", stats))
 app.add_handler(MessageHandler(TEXT, message))
 app.add_handler(MessageHandler(Document.ALL, document))
+app.add_handler(CallbackQueryHandler(callback))
 a.register(exit_handler)
 
 thread = threading.Thread(target=first_of_month)
