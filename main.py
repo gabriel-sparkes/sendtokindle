@@ -55,11 +55,12 @@ def first_of_month():
     while True:
         today = datetime.today().day
         if today == 1:
+            print("Today is first of month")
             user_stats["monthly_users"] = []
             user_stats["sent_this_month"] = 0
-        with open("stats.dat", "wb") as f:
-            p.dump(user_stats, f)
-        time.sleep(3600)
+            with open("stats.dat", "wb") as f:
+                p.dump(user_stats, f)
+        time.sleep(86400)
 
 def is_valid_email(text: str):
     pattern = r'^[a-zA-Z0-9._%+-]+@kindle\.com$'
@@ -138,7 +139,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             path = await file.download_to_drive()
             send_mail(KINDLE_EMAIL, to, "Here's your file! :)", "Your file, sent via @sendtokindle_robot on telegram", path, file_name)
             os.remove(path)
-            await update.message.reply_text("Your file has been sent successfully!")
+            await update.message.reply_text("Your file has been sent successfully! Please wait a minute or two for it to show up on your device")
             user_stats["total_sent"] += 1
             user_stats["sent_this_month"] += 1
             if user_id not in user_stats["monthly_users"]:
