@@ -106,7 +106,6 @@ def is_under_maintenance():
     return users[OWNER_ID].get("maintenance", False)
     
 def send_mail(send_from: str, send_to: str, text: str, subject: str, file: str, file_name: str):
-    return
     s = smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ssl.create_default_context())
 
     message = MIMEMultipart()
@@ -238,6 +237,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         users[OWNER_ID]["broadcasting"] = True
 
 async def send_to_everyone(update: Update, message: str, app=app):
+    to_remove = []
     if len(users) == 1:
         await update.message.reply_text("It looks like no one's used the bot except you!")
         users[OWNER_ID]["broadcasting"] = False
@@ -245,7 +245,12 @@ async def send_to_everyone(update: Update, message: str, app=app):
     for user in users:
         if user == OWNER_ID:
             continue
-        await app.bot.send_message(user, "Message from owner:\n" + message)
+        try:
+            await app.bot.send_message(user, "Message from owner:\n" + message)
+        except:
+            to_remove.append(user)
+    for user in to_remove:
+        del users[user]
     users[OWNER_ID]["broadcasting"] = False
     await update.message.reply_text("Message sent!")
 
